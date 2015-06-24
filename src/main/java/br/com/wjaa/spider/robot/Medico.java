@@ -1,0 +1,136 @@
+package br.com.wjaa.spider.robot;
+
+/**
+ * Created by wagner on 22/06/15.
+ */
+public class Medico {
+    private String nome;
+    private String especialidades;
+    private String endereco;
+    private String crm;
+    private String inscritoEm;
+    private String situacao;
+    private String urlFoto;
+    private String email;
+
+    public String getNome() {
+        return nome;
+    }
+
+    public void setNome(String nome) {
+        this.nome = nome != null ? nome.replaceAll("Nome ", "") : "";
+    }
+
+
+
+    public String getEspecialidades() {
+        return especialidades;
+    }
+
+    public void setEspecialidades(String especialidades) {
+        this.especialidades = especialidades != null ? especialidades.replaceAll("Especialidades - RQE","") : "";
+    }
+
+    public String getEndereco() {
+        return endereco;
+    }
+
+    public void setEndereco(String endereco) {
+        this.endereco = endereco != null ? endereco.replaceAll("Endereço ","") : "";
+    }
+
+    public String getCrm() {
+        return crm;
+    }
+
+    public void setCrm(String crm) {
+        this.crm = crm != null ? crm.replace("CRM: ","").replaceAll(" Inscrito em [0-9]+/[0-9]+/[0-9]+","") : "";
+    }
+
+    public String getInscritoEm() {
+        return inscritoEm;
+    }
+
+    public void setInscritoEm(String inscritoEm) {
+        this.inscritoEm = inscritoEm != null ? inscritoEm.replaceAll("CRM: [0-9]+ Inscrito em ","").trim() : "";
+    }
+
+    public String getSituacao() {
+        return situacao;
+    }
+
+    public void setSituacao(String situacao) {
+        this.situacao = situacao != null ? situacao.replaceAll("Situação ","") : "";
+    }
+
+    public String getUrlFoto() {
+        return urlFoto;
+    }
+
+    public void setUrlFoto(String urlFoto) {
+        this.urlFoto = urlFoto != null ? urlFoto.replace("width:80px; height:111px; background:url(","")
+                .replace(") center top no-repeat; border:#47958A 2px solid; clear:both;", "")
+                : "library/modulos/images/guia/inativo.jpg";
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email != null ? email.replaceAll("Email","").trim() : "" ;
+    }
+
+    public boolean validate() {
+        //TODO VERIFICAR AQUI SE ESTÁ ATIVO E OUTRAS REGRAS PARA NAO CADASTRAR MEDICOS SEM MUITA INFORMACAO
+        // E MEDICOS Q NAO ESTAO ATIVOS.
+        return true;
+    }
+
+
+    @Override
+    public String toString() {
+        return "Medico{" +
+                "nome='" + nome + '\'' +
+                ", especialidades='" + especialidades + '\'' +
+                ", endereco='" + endereco + '\'' +
+                ", crm='" + crm + '\'' +
+                ", inscritoEm='" + inscritoEm + '\'' +
+                ", situacao='" + situacao + '\'' +
+                ", urlFoto='" + urlFoto + '\'' +
+                ", email='" + email + '\'' +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Medico medico = (Medico) o;
+
+        if (nome != null ? !nome.equals(medico.nome) : medico.nome != null) return false;
+        if (especialidades != null ? !especialidades.equals(medico.especialidades) : medico.especialidades != null)
+            return false;
+        if (endereco != null ? !endereco.equals(medico.endereco) : medico.endereco != null) return false;
+        if (crm != null ? !crm.equals(medico.crm) : medico.crm != null) return false;
+        if (inscritoEm != null ? !inscritoEm.equals(medico.inscritoEm) : medico.inscritoEm != null) return false;
+        if (situacao != null ? !situacao.equals(medico.situacao) : medico.situacao != null) return false;
+        if (urlFoto != null ? !urlFoto.equals(medico.urlFoto) : medico.urlFoto != null) return false;
+        return !(email != null ? !email.equals(medico.email) : medico.email != null);
+
+    }
+
+    @Override
+    public int hashCode() {
+        int result = nome != null ? nome.hashCode() : 0;
+        result = 31 * result + (especialidades != null ? especialidades.hashCode() : 0);
+        result = 31 * result + (endereco != null ? endereco.hashCode() : 0);
+        result = 31 * result + (crm != null ? crm.hashCode() : 0);
+        result = 31 * result + (inscritoEm != null ? inscritoEm.hashCode() : 0);
+        result = 31 * result + (situacao != null ? situacao.hashCode() : 0);
+        result = 31 * result + (urlFoto != null ? urlFoto.hashCode() : 0);
+        result = 31 * result + (email != null ? email.hashCode() : 0);
+        return result;
+    }
+}
