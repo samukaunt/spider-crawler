@@ -9,11 +9,19 @@ import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.CookieStore;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.BasicHttpContext;
+import org.apache.http.protocol.HttpContext;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -23,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.sql.DatabaseMetaData;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -39,9 +48,10 @@ public class SpiderRobot {
 
 
 
-    private static final String URL_SEARCH = "http://www.cremesp.org.br/?siteAcao=GuiaMedico&pesquisa=proc";
-    private static final DefaultHttpClient client = new DefaultHttpClient();
-    private static Header session;
+    private final String URL_SEARCH = "http://www.cremesp.org.br/?siteAcao=GuiaMedico&pesquisa=proc";
+    private final CloseableHttpClient client = HttpClients.createDefault();
+    CookieStore cookies = new BasicCookieStore();
+
 
     public List<Medico> letsGo() {
         List<Medico> medicos = new ArrayList<Medico>();
@@ -63,13 +73,16 @@ public class SpiderRobot {
             postParams.add(new BasicNameValuePair("cidade","SAO PAULO"));
             UrlEncodedFormEntity entity = new UrlEncodedFormEntity(postParams);
             search.setEntity(entity);
-            HttpResponse response = client.execute(search);
+
+            HttpContext httpContext = new BasicHttpContext();
+
+            httpContext.setAttribute(HttpClientContext.COOKIE_STORE, cookies);
+            HttpResponse response = client.execute(search,httpContext);
             org.apache.http.Header[] headers1 = response.getAllHeaders();
 
             for(int i=0;i<headers1.length; i++)
             {
                 if (headers1[i].getName().equals("Set-Cookie")){
-                    session = headers1[i];
                     System.out.println("Header Name 2 ::"+headers1[i].getName());
                     System.out.println("Header Val 2 ::"+headers1[i].getValue());
                 }
@@ -92,7 +105,7 @@ public class SpiderRobot {
             System.out.print("Entre com o hash: ");
             String hash = s.next();
 
-            paginate(code1, code2, hash, medicos, "", 1);
+            paginate(code1, code2, hash, medicos, "", 1, "");
 
         } catch (ClientProtocolException e) {
             e.printStackTrace();
@@ -107,7 +120,7 @@ public class SpiderRobot {
 
 
 
-    private void paginate(String code1, String code2, String hash, List<Medico> medicos, String urlPage, Integer pagina ) {
+    private void paginate(String code1, String code2, String hash, List<Medico> medicos, String urlPage, Integer pagina, String urlAnterior ) {
         try{
             Document doc = null;
             if (pagina == 1){
@@ -133,7 +146,9 @@ public class SpiderRobot {
 
                 UrlEncodedFormEntity entity = new UrlEncodedFormEntity(postParams);
                 search.setEntity(entity);
-                HttpResponse response = client.execute(search);
+                HttpContext httpContext = new BasicHttpContext();
+                httpContext.setAttribute(HttpClientContext.COOKIE_STORE, cookies);
+                HttpResponse response = client.execute(search, httpContext);
                 InputStream page = response.getEntity().getContent();
                 doc = Jsoup.parse(page, "ISO-8859-1", "?siteAcao=GuiaMedico&pesquisa=proc");
 
@@ -143,8 +158,19 @@ public class SpiderRobot {
                 get.setHeader("Accept-Language","pt,en-US;q=0.8,en;q=0.6,pt-BR;q=0.4");
                 get.setHeader("Connection","keep-alive");
                 get.setHeader("Host","www.cremesp.org.br");
-                get.setHeader("Referer:", URL_SEARCH);
-                HttpResponse response = client.execute(get);
+
+                if (pagina == 2){
+                    get.setHeader("Referer:", URL_SEARCH);
+                }else{
+                    get.setHeader("Referer:", urlAnterior);
+                }
+                HttpContext httpContext = new BasicHttpContext();
+                httpContext.setAttribute(HttpClientContext.COOKIE_STORE, cookies);
+                RequestConfig config =  RequestConfig.custom().setConnectTimeout(10000)
+                        .setConnectionRequestTimeout(10000)
+                        .setSocketTimeout(10000).build();
+                httpContext.setAttribute(HttpClientContext.REQUEST_CONFIG, config);
+                HttpResponse response = client.execute(get,httpContext);
                 InputStream page = response.getEntity().getContent();
                 doc = Jsoup.parse(page, "ISO-8859-1", "?siteAcao=GuiaMedico&pesquisa=proc");
             }
@@ -155,7 +181,7 @@ public class SpiderRobot {
 
             if (paginator != null){
                 System.out.println("Pegando proxima pagina = " + paginator.getPagina());
-                paginate(code1,code2,hash,medicos,paginator.getUrlPage(),paginator.getPagina());
+                paginate(code1,code2,hash,medicos,paginator.getUrlPage(),paginator.getPagina(), urlPage);
             }
 
         } catch (ClientProtocolException e) {
