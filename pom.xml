@@ -50,6 +50,13 @@
             <artifactId>commons-collections</artifactId>
             <version>1.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-chrome-driver</artifactId>
+            <version>2.46.0</version>
+        </dependency>
+
     </dependencies>
 
 </project>

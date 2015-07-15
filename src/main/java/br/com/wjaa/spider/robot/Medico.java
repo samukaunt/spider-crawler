@@ -18,7 +18,7 @@ public class Medico {
     }
 
     public void setNome(String nome) {
-        this.nome = nome != null ? nome.replaceAll("Nome ", "") : "";
+        this.nome = nome;
     }
 
 
@@ -28,7 +28,7 @@ public class Medico {
     }
 
     public void setEspecialidades(String especialidades) {
-        this.especialidades = especialidades != null ? especialidades.replaceAll("Especialidades - RQE","") : "";
+        this.especialidades = especialidades;
     }
 
     public String getEndereco() {
@@ -36,7 +36,7 @@ public class Medico {
     }
 
     public void setEndereco(String endereco) {
-        this.endereco = endereco != null ? endereco.replaceAll("Endereço ","") : "";
+        this.endereco = endereco;
     }
 
     public String getCrm() {
@@ -44,7 +44,7 @@ public class Medico {
     }
 
     public void setCrm(String crm) {
-        this.crm = crm != null ? crm.replace("CRM: ","").replaceAll(" Inscrito em [0-9]+/[0-9]+/[0-9]+","") : "";
+        this.crm = crm;
     }
 
     public String getInscritoEm() {
@@ -52,7 +52,7 @@ public class Medico {
     }
 
     public void setInscritoEm(String inscritoEm) {
-        this.inscritoEm = inscritoEm != null ? inscritoEm.replaceAll("CRM: [0-9]+ Inscrito em ","").trim() : "";
+        this.inscritoEm = inscritoEm;
     }
 
     public String getSituacao() {
@@ -60,7 +60,7 @@ public class Medico {
     }
 
     public void setSituacao(String situacao) {
-        this.situacao = situacao != null ? situacao.replaceAll("Situação ","") : "";
+        this.situacao = situacao;
     }
 
     public String getUrlFoto() {
@@ -68,9 +68,7 @@ public class Medico {
     }
 
     public void setUrlFoto(String urlFoto) {
-        this.urlFoto = urlFoto != null ? urlFoto.replace("width:80px; height:111px; background:url(","")
-                .replace(") center top no-repeat; border:#47958A 2px solid; clear:both;", "")
-                : "library/modulos/images/guia/inativo.jpg";
+        this.urlFoto = urlFoto;
     }
 
     public String getEmail() {
@@ -78,7 +76,7 @@ public class Medico {
     }
 
     public void setEmail(String email) {
-        this.email = email != null ? email.replaceAll("Email","").trim() : "" ;
+        this.email = email;
     }
 
     public boolean validate() {

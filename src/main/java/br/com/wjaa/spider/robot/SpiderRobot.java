@@ -26,7 +26,14 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriverService;
+import org.openqa.selenium.remote.DesiredCapabilities;
+import org.openqa.selenium.remote.RemoteWebDriver;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -57,22 +64,20 @@ public class SpiderRobot {
         List<Medico> medicos = new ArrayList<Medico>();
         try {
 
-            HttpPost search = new HttpPost(URL_SEARCH);
+            HttpGet search = new HttpGet(URL_SEARCH);
             search.setHeader("Accept","text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
             search.setHeader("Accept-Language","pt,en-US;q=0.8,en;q=0.6,pt-BR;q=0.4");
             search.setHeader("Cache-Control","max-age=0");
             search.setHeader("Connection","keep-alive");
-            search.setHeader("Content-Type","application/x-www-form-urlencoded");
             search.setHeader("Host","www.cremesp.org.br");
-            search.setHeader("Origin","http://www.cremesp.org.br");
-            search.setHeader("Referer:",URL_SEARCH);
-            List<NameValuePair> postParams = new ArrayList<NameValuePair>();
+            search.setHeader("User-Agent","Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36");
+            /*List<NameValuePair> postParams = new ArrayList<NameValuePair>();
             postParams.add(new BasicNameValuePair("tipo", "nome"));
             postParams.add(new BasicNameValuePair("tipo_pesquisa", "avancada"));
             postParams.add(new BasicNameValuePair("palavra","a"));
             postParams.add(new BasicNameValuePair("cidade","SAO PAULO"));
             UrlEncodedFormEntity entity = new UrlEncodedFormEntity(postParams);
-            search.setEntity(entity);
+            search.setEntity(entity);*/
 
             HttpContext httpContext = new BasicHttpContext();
 
@@ -239,31 +244,7 @@ public class SpiderRobot {
 
 
 
-    public List<Medico> makeMedico(Elements medico){
 
-
-        List<Medico> medicos = new ArrayList<Medico>();
-        for (int i = 0; i < medico.size(); i++){
-            Elements tds = medico.get(i).select("tbody > tr > td");
-            Medico p = new Medico();
-
-            p.setUrlFoto(tds.get(1).select("#foto").attr("style"));
-            p.setNome(tds.get(3).text());
-            p.setCrm(tds.get(2).text());
-            p.setEmail(tds.get(4).text());
-            p.setEspecialidades(tds.get(5).text());
-            p.setEndereco(tds.get(6).text());
-            p.setSituacao(tds.get(7).text());
-            p.setInscritoEm(tds.get(2).text());
-            //System.out.println(p);
-            //System.out.println("--------------------------------");
-
-            medicos.add(p);
-
-        }
-        return medicos;
-
-    }
 
 
     private String getUrlImagem(Element e) {
@@ -321,7 +302,86 @@ public class SpiderRobot {
 
     public static void main (String args[]){
         SpiderRobot sr = new SpiderRobot();
-        sr.letsGo();
+        sr.letsGoSelenium();
+    }
+
+
+    private static ChromeDriverService service;
+    private WebDriver driver;
+    private void letsGoSelenium() {
+        service = new ChromeDriverService.Builder()
+                .usingDriverExecutable(new File("/opt/chromedriver/chromedriver"))
+                .usingAnyFreePort()
+                .build();
+
+        try {
+            service.start();
+            driver = new RemoteWebDriver(service.getUrl(),
+                    DesiredCapabilities.chrome());
+            driver.get(URL_SEARCH);
+
+            WebElement inputCaptcha = driver.findElement(By.id("recaptcha_response_field"));
+            Scanner s = new Scanner(System.in);
+
+            System.out.print("Entre com o codigo 1: ");
+            String code = s.next();
+            inputCaptcha.sendKeys(code);
+
+            WebElement buttonSearch = driver.findElement(By.name("submit"));
+            buttonSearch.submit();
+
+            Document doc = Jsoup.parse(driver.getPageSource());
+
+            List<Medico> medicos = new ArrayList<Medico>();
+            medicos.addAll(makeMedico(doc.select(".fonte11 > tbody > tr > td > table")));
+            System.out.print("Medicos encontrados = " + medicos.size());
+
+            WebElement proximaPagina = driver.findElement(By.linkText("próxima"));
+
+            while (proximaPagina != null){
+                WebElement pagina = driver.findElements(By.cssSelector("table.fonte11 > tbody > tr > td > b")).get(2);
+                System.out.println("Pagina Atual = " + pagina.getText());
+                proximaPagina.click();
+                proximaPagina = driver.findElement(By.linkText("próxima"));
+                doc = Jsoup.parse(driver.getPageSource());
+                medicos.addAll(makeMedico(doc.select(".fonte11 > tbody > tr > td > table")));
+                System.out.println("Medicos encontrados = " + medicos.size());
+                Thread.sleep(2000);
+            }
+
+            //searchBox.quit();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public List<Medico> makeMedico(Elements medico){
+
+
+        List<Medico> medicos = new ArrayList<Medico>();
+        for (int i = 0; i < medico.size(); i++){
+            Elements tds = medico.get(i).select("tbody > tr > td");
+            Medico p = new Medico();
+
+            p.setUrlFoto(tds.get(0).select("#foto").attr("style"));
+            p.setNome(tds.get(1).text());
+            p.setCrm(tds.get(2).text());
+            p.setEmail(tds.get(4).text());
+            p.setEspecialidades(tds.get(5).text());
+            p.setEndereco(tds.get(6).text());
+            p.setSituacao(tds.get(7).text());
+            p.setInscritoEm(tds.get(2).text());
+            //System.out.println(p);
+            //System.out.println("--------------------------------");
+
+            medicos.add(p);
+
+        }
+        return medicos;
+
     }
 
 
