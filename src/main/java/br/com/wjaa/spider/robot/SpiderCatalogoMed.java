@@ -1,5 +1,7 @@
 package br.com.wjaa.spider.robot;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jsoup.Jsoup;
@@ -13,12 +15,15 @@ import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
+import javax.imageio.ImageIO;
+import java.awt.image.RenderedImage;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Scanner;
 
 /**
  * Created by wagner on 15/07/15.
@@ -29,6 +34,7 @@ public class SpiderCatalogoMed {
     private static final Log log = LogFactory.getLog(SpiderCatalogoMed.class);
     private static ChromeDriverService service;
     private WebDriver driver;
+    private Gson gson = new GsonBuilder().create();
     public static void main(String [] args){
         SpiderCatalogoMed spider = new SpiderCatalogoMed();
         spider.letsGo();
@@ -50,26 +56,51 @@ public class SpiderCatalogoMed {
                     DesiredCapabilities.chrome());
             driver.get(URL_SEARCH);
             log.info("abrindo pagina principal");
-            Thread.sleep(2000);
+            Thread.sleep(5000);
             WebElement souPaciente = driver.findElement(By.linkText("Sou paciente"));
 
             if (souPaciente != null){
-                souPaciente.click();
+                try{
+                    souPaciente.click();
+                }catch(Exception e){
+                    log.error("Erro ao clicar no link sou paciente");
+                }
+
             }
             Thread.sleep(2000);
 
             WebElement proximaPagina = driver.findElement(By.linkText(">"));
             log.info("verificando existencia de proxima pagina, existe? = " + (proximaPagina != null));
+            int count = 1;
             while (proximaPagina != null){
+                log.info("#######PAGINA = " + count++);
                 String linkProximaPagina = proximaPagina.getAttribute("href");
                 List<String> links = this.getLinksMedicos(driver.findElements(By.cssSelector(".nameprop")));
-                log.info("Busca encontrou na pagina " + links.size() + " medico(s)");
+                log.info("Busca encontrou na pagina, " + links.size() + " medico(s)");
+
                 for (String linkMedico : links){
                     log.info("abrindo perfil...");
                     driver.get(linkMedico);
-                    doc = Jsoup.parse(driver.getPageSource());
+                    Thread.sleep(4000);
+                    log.info("clicando nos links de telefones");
+                    List<WebElement> linkTelefones = driver.findElements(By.className("seephone"));
+                    for(WebElement e : linkTelefones ){
+                        try{
+                            e.click();
+                            Thread.sleep(500);
+                        }catch(Exception ex){
+                            log.error("Erro ao clicar no link sou paciente");
+                        }
+
+                    }
+                    Thread.sleep(1000);
                     log.info("construindo medico...");
-                    medicos.add(makeMedico(doc));
+                    doc = Jsoup.parse(driver.getPageSource());
+                    MedicoVo medico = makeMedico(doc);
+                    String json = gson.toJson(medico);
+
+                    this.appendFile(json);
+
 
                     Thread.sleep(1000);
                     //TODO TALVEZ AQUI PRECISE VOLTAR..
@@ -90,6 +121,18 @@ public class SpiderCatalogoMed {
             e.printStackTrace();
         }
 
+    }
+
+    private void appendFile(String json) {
+        try{
+            FileWriter fw = new FileWriter("/home/wagner/workspace-wjaa/dados-medicos/medicos.json",true); //the true will append the new data
+            fw.write(json);//appends the string to the file
+            fw.write("\n\n");//appends the string to the file
+            fw.close();
+        }
+        catch(IOException ioe){
+            System.err.println("IOException: " + ioe.getMessage());
+        }
     }
 
     private List<String> getLinksMedicos(List<WebElement> elements) {
@@ -113,24 +156,28 @@ public class SpiderCatalogoMed {
             this.setEndereco(medicoVo,dado);
 
         }
-        return null;
+        return medicoVo;
     }
 
     private void setEndereco(MedicoVo medicoVo, Element dado) {
         EnderecoVo endVo = new EnderecoVo();
         Elements rua = dado.select(".address");
         if (rua != null){
-            endVo.setLocalidade(rua.get(0).text());
+            endVo.setLogradouro(rua.get(0).text());
         }
         Elements cidadeBairro = dado.select(".city");
         if (cidadeBairro != null){
             String value = cidadeBairro.get(0).text();
-            String bairro = value.substring(0,value.indexOf("-"));
-            String cidade = value.substring(value.indexOf("-"),value.indexOf("/"));
-            String uf = value.substring(value.indexOf("/"),value.length());
-            endVo.setBairro(bairro);
-            endVo.setLocalidade(cidade);
-            endVo.setUf(uf);
+            if (value.contains("-")){
+                String bairro = value.substring(0,value.indexOf("-"));
+                endVo.setBairro(bairro);
+            }
+            if (value.contains("-") && value.contains("/")){
+                String cidade = value.substring(value.indexOf("-")+1,value.indexOf("/"));
+                endVo.setLocalidade(cidade);
+                String uf = value.substring(value.indexOf("/")+1,value.length());
+                endVo.setUf(uf);
+            }
         }
         Elements cep = dado.select(".postalCode");
         if (cep != null){
@@ -139,7 +186,7 @@ public class SpiderCatalogoMed {
 
         Elements phone = dado.select(".phoneContainer");
         if (phone != null){
-            endVo.setTelefone(phone.get(0).text());
+            endVo.setTelefone(phone.get(0).text().replaceAll("(Mencione o catalogo.med.br quando ligar.)",""));
         }
 
 
@@ -167,23 +214,42 @@ public class SpiderCatalogoMed {
         }
         Elements eespec = doc.select(".doctor_specs li");
         if (eespec != null){
-            String espec = eespec.get(0).text();
-            String [] especs = espec.split(",");
-            if (especs != null && especs.length > 0){
-
-                for (int i = 0; i < especs.length; i++){
-                    EspecialidadeVo especVo = new EspecialidadeVo();
-                    especVo.setNome(especs[i]);
-                    medicoVo.addEspecialidade(especVo);
-                }
+            for (int i = 0; i < eespec.size(); i++){
+                String espec = eespec.get(i).text();
+                EspecialidadeVo especVo = new EspecialidadeVo();
+                especVo.setNome(espec);
+                medicoVo.addEspecialidade(especVo);
             }
-
         }
         //CRM: 102071 - SP. RQE: 42192
         Elements crm = doc.select(".docid");
         if (crm != null){
             String value = crm.get(0).text();
-            medicoVo.setCrm(Integer.valueOf(value.substring(value.indexOf("CRM:"),value.indexOf("-")).trim()));
+            value = value.replaceAll("CRM:", "");
+            if (value.contains("-")){
+                medicoVo.setCrm(Integer.valueOf(value
+                        .substring(0, value.indexOf("-"))
+                        .trim()));
+            }
+        }
+        Elements foto = doc.select(".showphoto img");
+        if (foto != null){
+            String urlFoto = foto.get(0).attr("src");
+            try {
+                URL uri = new URL(urlFoto);
+                // gravando imagem
+                RenderedImage img = ImageIO.read(uri);
+                if (medicoVo.getCrm() != null){
+
+                    ImageIO.write((RenderedImage) img, "jpg", new File("/home/wagner/workspace-wjaa/dados-medicos/fotos/" + medicoVo.getCrm() + ".jpg"));
+                }
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
         }
 
 
