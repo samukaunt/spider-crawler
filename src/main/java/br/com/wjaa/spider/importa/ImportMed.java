@@ -47,7 +47,7 @@ public class ImportMed {
                 MedicoEntity me = new MedicoEntity();
                 me.setNome(m.getNome());
                 me.setCrm(m.getCrm());
-                me.setClinicas(getClinicas(m.getEnderecos()));
+                me.setClinicas(getClinicas(m.getEnderecos(),me));
                 me.setEmail("unknow@unknow.com.br");
                 me.setAceitaParticular(true);
                 me.setSenha("unknow");
@@ -56,7 +56,7 @@ public class ImportMed {
 
                 CloseableHttpResponse response = null;
 
-                HttpPost post = new HttpPost("http://localrest.marcmed.com.br/medico/save");
+                HttpPost post = new HttpPost("http://localhost:8080/ranchucrutes-ws/medico/save");
                 post.setHeader("dataType","json");
                 post.setHeader("Content-Type","application/json");
                 post.setHeader("mimeType","application/json");
@@ -104,28 +104,84 @@ public class ImportMed {
         return null;
     }
 
-    private static List<MedicoClinicaEntity> getClinicas(List<EnderecoVo> enderecos) {
+    private static List<MedicoClinicaEntity> getClinicas(List<EnderecoVo> enderecos, MedicoEntity m) {
         List<MedicoClinicaEntity> medicoClinicaEntities = new ArrayList<MedicoClinicaEntity>();
         for(EnderecoVo e : enderecos){
             MedicoClinicaEntity mc = new MedicoClinicaEntity();
 
-            mc.setClinica(getClinica(e));
+            mc.setClinica(getClinica(e, m));
             medicoClinicaEntities.add(mc);
         }
         return medicoClinicaEntities;
     }
 
-    private static ClinicaEntity getClinica(EnderecoVo e) {
+    private static ClinicaEntity getClinica(EnderecoVo e, MedicoEntity m) {
         ClinicaEntity c = new ClinicaEntity();
         EnderecoEntity ee = new EnderecoEntity();
         ee.setUf(e.getUf());
         ee.setBairro(e.getBairro());
         ee.setCep(e.getCep() != null ? e.getCep().replace("-","") : "");
         ee.setComplemento(e.getComplemento());
-        ee.setLogradouro(e.getLogradouro());
+
+        if ( StringUtils.isNotBlank(e.getLogradouro()) ){
+            String log[] = e.getLogradouro().split(",");
+            if (log.length == 1){
+                ee.setLogradouro(e.getLogradouro());
+            }else if (log.length == 2){
+                ee.setLogradouro(log[0]);
+                try{
+                    if (log[1].contains("-")){
+                        String comp[] = log[1].split("-");
+                        ee.setNumero(Integer.valueOf(comp[0].trim()));
+                        ee.setComplemento(comp[1]);
+                    }else{
+                        ee.setNumero(Integer.valueOf(log[1].trim()));
+                    }
+                }catch(Exception ex){
+                    System.out.println("Erro no parse do numero = " + log[1] + " jogando no complemento");
+                    ee.setComplemento("Numero " + log[1]);
+                }
+            }else if (log.length > 2){
+                ee.setLogradouro(log[0]);
+            }else{
+                ee.setLogradouro(e.getLogradouro());
+            }
+        }
         ee.setLocalidade(e.getLocalidade());
-        ee.setNumero(0);
         c.setEndereco(ee);
+
+        try{
+
+            if ( StringUtils.isNotBlank(e.getTelefone())) {
+                String tels [] = e.getTelefone().split(";");
+
+                if (tels.length > 1){
+                    for(String tel : tels){
+                        String telddd[] = tel.split(" ");
+                        if (telddd.length == 2){
+                            if (telddd[1].startsWith("9")){
+                                m.setDdd(Short.valueOf(telddd[0].trim()));
+                                m.setCelular(Long.valueOf(telddd[1].trim()));
+                            }else{
+                                c.setDdd(Short.valueOf(telddd[0].trim()));
+                                c.setTelefone(Long.valueOf(telddd[1].trim()));
+                            }
+                        }
+                    }
+                }else{
+                    String telddd [] = tels[0].split(" ");
+                    if (telddd.length == 2){
+                        c.setDdd(Short.valueOf(telddd[0].trim()));
+                        c.setTelefone(Long.valueOf(telddd[1].trim()));
+                    }
+                }
+
+
+            }
+        }catch(Exception ex){
+            System.out.println("erro no telefone =" + ex.getMessage());
+        }
+
         return c;
     }
 
