@@ -52,11 +52,22 @@ public class ImportMed {
                 me.setAceitaParticular(true);
                 me.setSenha("unknow");
                 me.setEspecialidades(getEspecialidade(m.getEspecialidades()));
-                System.out.println("Salvando o médico");
 
-                CloseableHttpResponse response = null;
+                if (me.getEspecialidades() == null && m.getEspecialidades() != null){
+                    for (EspecialidadeVo e : m.getEspecialidades() ){
+                        System.out.println(e.getNome());
+                    }
+                } if (m.getEspecialidades() == null){
+                    System.out.println(m.getNome());
+                }
 
-                HttpPost post = new HttpPost("http://localhost:8080/ranchucrutes-ws/medico/save");
+
+
+               System.out.println("Salvando o médico numero [ " + ++count + "]");
+
+               CloseableHttpResponse response = null;
+
+                HttpPost post = new HttpPost("http://localhost:9191/ranchucrutes-ws/medico/save");
                 post.setHeader("dataType","json");
                 post.setHeader("Content-Type","application/json");
                 post.setHeader("mimeType","application/json");
@@ -97,11 +108,36 @@ public class ImportMed {
 
     private static EspecialidadeEntity getEspecialidadeByVo(EspecialidadeVo e) {
         for(EspecialidadeEntity ee : especialidades){
+
+            //verificando igualdade completa
             if (ee.getNome().equalsIgnoreCase(e.getNome())){
                 return ee;
             }
+
+            //verificando igualdade parcial
+            String nomeVo [] = e.getNome().split(" ");
+            String nomeEntity [] = ee.getNome().split(" ");
+            if (nomeVo.length == nomeEntity.length){
+                boolean equal = true;
+                for (int i = 0; i < nomeVo.length; i++){
+                    //maior que 4 para ignorar os 'de' 'a' 'da'
+                    if (nomeVo[i].length() > 4){
+                       // System.out.println("comparando esse =" + nomeEntity[i] + " com o começo desse " + getParcial(nomeVo[i]));
+                        equal &= nomeEntity[i].startsWith(getParcial(nomeVo[i]));
+                    }
+                }
+
+                if (equal){
+                    return ee;
+                }
+
+            }
         }
         return null;
+    }
+
+    private static String getParcial(String s) {
+        return s.substring(0,s.length()-3);
     }
 
     private static List<MedicoClinicaEntity> getClinicas(List<EnderecoVo> enderecos, MedicoEntity m) {
@@ -138,7 +174,7 @@ public class ImportMed {
                         ee.setNumero(Integer.valueOf(log[1].trim()));
                     }
                 }catch(Exception ex){
-                    System.out.println("Erro no parse do numero = " + log[1] + " jogando no complemento");
+                    //System.out.println("Erro no parse do numero = " + log[1] + " jogando no complemento");
                     ee.setComplemento("Numero " + log[1]);
                 }
             }else if (log.length > 2){
@@ -159,7 +195,7 @@ public class ImportMed {
                     for(String tel : tels){
                         String telddd[] = tel.split(" ");
                         if (telddd.length == 2){
-                            if (telddd[1].startsWith("9")){
+                            if (telddd[1].startsWith("9") || telddd[1].startsWith("8") || telddd[1].startsWith("7")){
                                 m.setDdd(Short.valueOf(telddd[0].trim()));
                                 m.setCelular(Long.valueOf(telddd[1].trim()));
                             }else{
@@ -169,10 +205,28 @@ public class ImportMed {
                         }
                     }
                 }else{
-                    String telddd [] = tels[0].split(" ");
-                    if (telddd.length == 2){
-                        c.setDdd(Short.valueOf(telddd[0].trim()));
-                        c.setTelefone(Long.valueOf(telddd[1].trim()));
+                    if (tels[0].contains(" ")){
+
+                        String telddd [] = tels[0].split(" ");
+                        if (telddd.length == 2){
+                            c.setDdd(Short.valueOf(telddd[0].trim()));
+                            c.setTelefone(Long.valueOf(telddd[1].trim()));
+                        }else{
+                            if (telddd[0].startsWith("(")){
+                                String ntel = telddd[0].replace("(", "").replace(")", " ");
+                                telddd = ntel.split(" ");
+                                c.setDdd(Short.valueOf(telddd[0].trim()));
+                                c.setTelefone(Long.valueOf(telddd[1].trim()));
+                            }
+                        }
+                    }else{
+                        if (tels[0].startsWith("(")){
+                            String ntel = tels[0].replace("(", "").replace(")", " ");
+                            tels = ntel.split(" ");
+                            c.setDdd(Short.valueOf(tels[0].trim()));
+                            c.setTelefone(Long.valueOf(tels[1].trim()));
+                        }
+
                     }
                 }
 
@@ -186,3 +240,4 @@ public class ImportMed {
     }
 
 }
+
