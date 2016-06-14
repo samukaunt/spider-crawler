@@ -31,13 +31,13 @@ import java.util.List;
  */
 public class SpiderCatalogoMed {
 
-    private static String URL_SEARCH = "http://www.catalogo.med.br/?act=search&q=&fSpeciality=0&fCity=SP&plan=&lang=0&free=0&photo=0";
-    //private static String URL_SEARCH = "http://www.catalogo.med.br/index.pl?C=A&V=66436974793D5350266C616E673D302670686F746F3D3126667265653D3026713D26737465705365617263685F696E6465783D3130363026706C616E3D26665370656369616C6974793D30266163743D736561726368";
-
+    //private static String URL_SEARCH = "http://www.catalogo.med.br/?act=search&q=&fSpeciality=0&fCity=SP&plan=&lang=0&free=0&photo=0";
+    //private static String URL_SEARCH = "http://www.catalogo.med.br/index.pl?C=A&V=66436974793D4553266C616E673D302670686F746F3D3026667265653D3026713D26737465705365617263685F696E6465783D3026706C616E3D26665370656369616C6974793D30266163743D736561726368";
+    private static String URL_SEARCH = "http://www.catalogo.med.br/index.pl?C=A&V=66436974793D4553266C616E673D302670686F746F3D3026667265653D3026713D26737465705365617263685F696E6465783D{PAGINA}3026706C616E3D26665370656369616C6974793D30266163743D736561726368";
     //int countPaginas = 497;
     //int countMedicos = 3164;
     //int countProxy = 1;
-    int countPaginas = 1;
+    int countPaginas = 2;
     int countMedicos = 1;
     int countProxy = 1;
     private static final Log log = LogFactory.getLog(SpiderCatalogoMed.class);
@@ -56,7 +56,7 @@ public class SpiderCatalogoMed {
 
 
         /**-----*/
-        String PROXY = "http://127.0.0.1:8118";
+        String PROXY = "http://localhost:9229";
         org.openqa.selenium.Proxy proxy = new org.openqa.selenium.Proxy();
         proxy.setHttpProxy(PROXY)
                 .setFtpProxy(PROXY)
@@ -80,18 +80,18 @@ public class SpiderCatalogoMed {
                    // DesiredCapabilities.chrome());
 
             //driver = new ChromeDriver(cap);
-            driver.get(URL_SEARCH);
+            //driver.get(getProximaPagina(countPaginas));
+            driver.get("http://www.catalogo.med.br/index.pl?C=A&V=66436974793D4553266C616E673D302670686F746F3D3026667265653D3026713D26737465705365617263685F696E6465783D3026706C616E3D26665370656369616C6974793D30266163743D736561726368");
             log.info("abrindo pagina principal");
-            Thread.sleep(7000);
-            WebElement souPaciente = driver.findElement(By.linkText("Sou paciente"));
-
-            if (souPaciente != null){
-                try{
-                    souPaciente.click();
-                }catch(Exception e){
-                    log.error("Erro ao clicar no link sou paciente");
+            Thread.sleep(6000);
+            WebElement souPaciente;
+            try{
+                souPaciente = driver.findElement(By.linkText("Sou paciente"));
+                if (souPaciente != null){
+                       souPaciente.click();
                 }
-
+            }catch(Exception e){
+                log.error("Erro ao clicar no link sou paciente");
             }
             Thread.sleep(2000);
 
@@ -103,21 +103,17 @@ public class SpiderCatalogoMed {
             }
 
             log.info("verificando existencia de proxima pagina, existe? = " + (proximaPagina != null));
-            String linkProximaPagina = "";
+            String paginaAtual = "";
             while (proximaPagina != null){
                 try{
 
-                    if (linkProximaPagina != null){
-                        URL_SEARCH = linkProximaPagina;
-                    }
-                    linkProximaPagina = proximaPagina.getAttribute("href");
                     List<String> links = this.getLinksMedicos(driver.findElements(By.cssSelector(".nameprop")));
                     log.info("Busca encontrou na pagina, " + links.size() + " medico(s)");
-
+                    int countPerfil = 1;
                     for (String linkMedico : links){
-                        log.info("abrindo perfil...");
+                        log.info("abrindo perfil [" + countPerfil++ + "/" + links.size()+"]" );
                         driver.get(linkMedico);
-                        Thread.sleep(9000);
+                        Thread.sleep(7000);
                         log.info("clicando nos links de telefones");
                         List<WebElement> linkTelefones = driver.findElements(By.className("seephone"));
                         for(WebElement e : linkTelefones ){
@@ -139,23 +135,50 @@ public class SpiderCatalogoMed {
                         log.info("MEDICO ADICIONADO COM SUCESSO, INDO PARAO PRÓXIMO.");
                         Thread.sleep(1000);
                     }
-                    log.info("abrindo proxima pagina...");
-                    driver.get(linkProximaPagina);
+                    log.info("ABRINDO PROXIMA PAGINA [ " + countPaginas + "]...");
+                    paginaAtual = getProximaPagina(countPaginas);
+                    driver.get(paginaAtual);
+                    countPaginas++;
+                    Thread.sleep(4000);
+                    try{
+                       proximaPagina = driver.findElement(By.linkText(">"));
+                    }catch(Exception ex){
+                       log.error("nao existe proxima pagina");
+                        proximaPagina = null;
+                        int countErro = 0;
+                        while (proximaPagina == null && countErro < 15){
 
 
-                    proximaPagina = driver.findElement(By.linkText(">"));
-                    log.info("#######PAGINA = " + countPaginas++);
+                             executeCommand("/home/wagner/./reiniciaProxy.sh");
+                             Thread.sleep(10000);
+                             service.stop();
+                             service.start();
+                             Thread.sleep(5000);
+                            paginaAtual = getProximaPagina(countPaginas);
+                            driver.get(paginaAtual);
+                            Thread.sleep(6000);
+                            countPaginas++;
 
-                    Thread.sleep(2000);
+                            try{
+                                proximaPagina = driver.findElement(By.linkText(">"));
+                            }catch(Exception e) {
+                                log.error("nao existe proxima pagina");
+                                proximaPagina = null;
+                                countErro++;
+                            }
+                        }
+                    }
+
+
                 }catch (Exception ex){
                     log.error("Erro:" ,ex);
                     boolean conseguiu = false;
                     int quantidade = 1;
-                    while (!conseguiu  && quantidade < 8){
+                    while (!conseguiu  && quantidade < 10){
 
                         try{
 
-                            log.info("ROBO MORREU NA PAGINA = " + countPaginas + " COM TOTAL DE MEDICOS = " + countMedicos + "NA PAGINA = " + linkProximaPagina);
+                            log.info("ROBO MORREU NA PAGINA = " + countPaginas + " COM TOTAL DE MEDICOS = " + countMedicos + "NA PAGINA = " + paginaAtual);
                             log.info("REINICIANDO PROXY, QUANTIDADE = " + countProxy++);
                             executeCommand("/home/wagner/./reiniciaProxy.sh");
                             Thread.sleep(10000);
@@ -168,7 +191,7 @@ public class SpiderCatalogoMed {
                                     //DesiredCapabilities.chrome());
 
                             log.info("ABRINDO A PAGINA Q DEU PAU....");
-                            driver.get(URL_SEARCH);
+                            driver.get(paginaAtual);
                             Thread.sleep(5000);
 
                             try{
@@ -180,11 +203,19 @@ public class SpiderCatalogoMed {
                                 log.error("Erro ao clicar no link sou paciente");
                             }
 
-                            //log.info("abrindo proxima pagina...");
-                            //driver.get(linkProximaPagina);
-                            proximaPagina = driver.findElement(By.linkText(">"));
-                            Thread.sleep(2000);
-                            conseguiu = true;
+                            try {
+                                proximaPagina = driver.findElement(By.linkText(">"));
+                                Thread.sleep(2000);
+                                conseguiu = true;
+
+                            }catch(Exception eeex){
+                                log.info("pagina nao existe");
+
+                                countPaginas ++;
+                                paginaAtual = getProximaPagina(countPaginas);
+                                quantidade ++;
+                                conseguiu = false;
+                            }
 
                         }catch(Exception exx){
                             log.error("Ainda nao conseguiu...tentando novamente............");
@@ -194,11 +225,14 @@ public class SpiderCatalogoMed {
                     }
                 }
                 log.info("############### TERMINOU LOOP COM UM TOTAL DE " + countMedicos + " MEDICOS, EM " + countPaginas +
-                        " PAGINAS, COM  " + countProxy + " REINICIADAS DE PROXY E PAGINA = " + linkProximaPagina);
+                        " PAGINAS, COM  " + countProxy + " REINICIADAS DE PROXY");
 
 
             }
 
+            log.info("#########################################################################" );
+            log.info("############################## TERMINOUUUUU #############################" );
+            log.info("#########################################################################" );
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -244,7 +278,7 @@ public class SpiderCatalogoMed {
 
     private void appendFile(String json) {
         try{
-            FileWriter fw = new FileWriter("/home/wagner/workspace-wjaa/dados-medicos/medicos.json",true); //the true will append the new data
+            FileWriter fw = new FileWriter("/home/wagner/workpace-wjaa/dados-medicos/medicos.json",true); //the true will append the new data
             fw.write(json);//appends the string to the file
             fw.write("\n\n");//appends the string to the file
             fw.close();
@@ -292,9 +326,9 @@ public class SpiderCatalogoMed {
                 endVo.setBairro(bairro);
             }
             if (value.contains("-") && value.contains("/")){
-                String cidade = value.substring(value.indexOf("-")+1,value.indexOf("/"));
+                String cidade = value.substring(value.indexOf("-")+1,value.lastIndexOf("/"));
                 endVo.setLocalidade(cidade);
-                String uf = value.substring(value.indexOf("/")+1,value.length());
+                String uf = value.substring(value.lastIndexOf("/")+1,value.length());
                 endVo.setUf(uf);
             }
         }
@@ -360,7 +394,7 @@ public class SpiderCatalogoMed {
                 RenderedImage img = ImageIO.read(uri);
                 if (medicoVo.getCrm() != null){
 
-                    ImageIO.write((RenderedImage) img, "jpg", new File("/home/wagner/workspace-wjaa/dados-medicos/fotos/" + medicoVo.getCrm() + ".jpg"));
+                    ImageIO.write((RenderedImage) img, "jpg", new File("/home/wagner/workpace-wjaa/dados-medicos/fotos/" + medicoVo.getCrm() + ".jpg"));
                 }
             } catch (MalformedURLException e) {
                 e.printStackTrace();
@@ -373,7 +407,20 @@ public class SpiderCatalogoMed {
 
         }
 
+    }
 
+
+
+
+    private String getProximaPagina(int pagina){
+        String page = "";
+        pagina--;
+        String pagStr = String.valueOf(pagina);
+
+        for (int x = 0; x < pagStr.length(); x ++){
+            page += "3" + pagStr.charAt(x);
+        }
+        return URL_SEARCH.replace("{PAGINA}",page);
     }
 
 
