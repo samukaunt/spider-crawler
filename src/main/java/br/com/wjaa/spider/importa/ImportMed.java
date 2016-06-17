@@ -1,15 +1,16 @@
 package br.com.wjaa.spider.importa;
 
+import br.com.wjaa.spider.robot.ConvenioVo;
 import br.com.wjaa.spider.robot.EnderecoVo;
 import br.com.wjaa.spider.robot.EspecialidadeVo;
 import br.com.wjaa.spider.robot.MedicoVo;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -32,48 +33,77 @@ public class ImportMed {
 
     private static Gson gson = new GsonBuilder().create();
     private static EspecialidadeEntity [] especialidades;
-    private static List<ConvenioCategoriaEntity> categorias;
+    private static ConvenioCategoriaVo[] categorias;
     private static CloseableHttpClient httpclient = HttpClients.createDefault();
 
     public static void main(String [] args) throws IOException {
-
-        especialidades = gson.fromJson(new FileReader(new File("/home/wagner/Downloads/especs.json")),EspecialidadeEntity[].class);
-        BufferedReader f = new BufferedReader(new FileReader(new File("/home/wagner/Downloads/medicos.json")));
+        System.out.print("Iniciando para = " + args[0]);
+        categorias = gson.fromJson(new FileReader(new File("/home/wagner/dev/agendee/dados-medicos/categorias.json")),ConvenioCategoriaVo[].class);
+        especialidades = gson.fromJson(new FileReader(new File("/home/wagner/dev/agendee/dados-medicos/especs.json")),EspecialidadeEntity[].class);
+        BufferedReader f = new BufferedReader(new FileReader(new File("/home/wagner/dev/agendee/dados-medicos/medicos-"+args[0]+".json")));
+        String uf = args[0];
         String line = "";
         int count = 0;
         while ((line = f.readLine()) != null) {
             if (StringUtils.isNotBlank(line)){
                 MedicoVo m = gson.fromJson(line, MedicoVo.class);
-                MedicoEntity me = new MedicoEntity();
-                me.setNome(m.getNome());
-                me.setCrm(m.getCrm());
-                me.setClinicas(getClinicas(m.getEnderecos(),me));
-                me.setEmail("unknow@unknow.com.br");
-                me.setAceitaParticular(true);
-                me.setSenha("unknow");
-                me.setEspecialidades(getEspecialidade(m.getEspecialidades()));
 
-                if (me.getEspecialidades() == null && m.getEspecialidades() != null){
+                ProfissionalFullForm profissionalFullForm = new ProfissionalFullForm();
+                ProfissionalForm profissional = new ProfissionalForm();
+                profissionalFullForm.setClinicas(getClinicas(profissional,m));
+                profissional.setNome(m.getNome());
+                //profissional.setNumeroRegistro(m.getCrm().toString());
+                if (m.getCrm() != null){
+
+                    profissional.setNumeroRegistro(m.getCrm()  + "-" + uf);
+                    if (m.getCrm() != null){
+                        profissional.setFoto(profissional.getNumeroRegistro() + ".jpg");
+                    }
+                }
+                profissional.setEmail("empty@empty.com.br");
+                profissional.setSenha("empty");
+                profissional.setIdEspecialidade(getEspecialidade(m.getEspecialidades()));
+
+                if (profissional.getIdEspecialidade() == null && m.getEspecialidades() != null){
                     for (EspecialidadeVo e : m.getEspecialidades() ){
                         System.out.println(e.getNome());
                     }
-                } if (m.getEspecialidades() == null){
+                }
+
+                if (m.getEspecialidades() == null){
                     System.out.println(m.getNome());
                 }
 
+                System.out.println("Verificando se o médico nao existe na base, buscando pelo nome = " + m.getNome());
+                ProfissionalBasicoVo profissionalBasicoVo = getProfissionalByName(m.getNome());
+                if (profissionalBasicoVo != null && (!"1".equals(profissionalBasicoVo.getNumeroRegistro()) || uf.equals("SP"))){
+                    System.out.println("Profissional já é cadastrado, adicionando o id....");
+                    profissional.setIdLogin(profissionalBasicoVo.getId());
 
+                }else{
+                    System.out.println("Profissional novo, criando....");
+                    profissional = createProfissional(profissional);
 
+                    if (profissional == null){
+                        System.out.println("ERRO NA CRIACAO DO PROFISSIONAL PARTINDO PARA O PROXIMO");
+                        continue;
+                    }
+
+                    System.out.println("PROFISSIONAL CRIADO COM SUCESSO!");
+
+                }
+                profissionalFullForm.setProfissional(profissional);
                System.out.println("Salvando o médico numero [ " + ++count + "]");
 
                CloseableHttpResponse response = null;
 
-                HttpPost post = new HttpPost("http://localhost:9191/ranchucrutes-ws/medico/save");
+                HttpPost post = new HttpPost("http://rest.agendee.com.br/profissional/update");
                 post.setHeader("dataType","json");
                 post.setHeader("Content-Type","application/json");
                 post.setHeader("mimeType","application/json");
 
 
-                StringEntity entity = new StringEntity(gson.toJson(me), HTTP.UTF_8);
+                StringEntity entity = new StringEntity(gson.toJson(profissionalFullForm), HTTP.UTF_8);
                 post.setEntity(entity);
 
                 httpclient = HttpClients.createDefault();
@@ -95,23 +125,93 @@ public class ImportMed {
 
     }
 
-    private static List<EspecialidadeEntity> getEspecialidade(List<EspecialidadeVo> especialidades) {
-        if (especialidades != null){
-            List<EspecialidadeEntity> especialidadeEntities = new ArrayList<EspecialidadeEntity>(especialidades.size());
-            for(EspecialidadeVo e : especialidades){
-                especialidadeEntities.add(getEspecialidadeByVo(e));
+    private static ProfissionalForm createProfissional(ProfissionalForm profissional) throws IOException {
+        try{
+
+            CloseableHttpResponse response = null;
+
+            HttpPost post = new HttpPost("http://rest.agendee.com.br/profissional/save");
+            post.setHeader("dataType","json");
+            post.setHeader("Content-Type","application/json");
+            post.setHeader("mimeType","application/json");
+
+
+            StringEntity entity = new StringEntity(gson.toJson(profissional), HTTP.UTF_8);
+            post.setEntity(entity);
+
+            httpclient = HttpClients.createDefault();
+            response = httpclient.execute(post);
+
+            int statusCode = response.getStatusLine().getStatusCode();
+
+            if ( statusCode >= 400 ){
+                System.out.println("####### ERRO: " + EntityUtils.toString(response.getEntity(),HTTP.UTF_8));
+                return null;
+            }else{
+                System.out.println("NOVO PROFISSIONAL CRIADO COM SUCESSO");
             }
-            return especialidadeEntities;
+            return gson.fromJson(EntityUtils.toString(response.getEntity(), HTTP.UTF_8), ProfissionalForm.class);
+        }finally {
+            httpclient.close();
+        }
+
+    }
+
+    private static ProfissionalBasicoVo getProfissionalByName(String nome) throws IOException {
+
+        try{
+            CloseableHttpResponse response = null;
+
+            HttpPost post = new HttpPost("http://rest.agendee.com.br/profissional/name/search");
+            post.setHeader("Content-Type","application/x-www-form-urlencoded");
+
+            ArrayList<NameValuePair> postParameters = new ArrayList<NameValuePair>();
+            postParameters.add(new BasicNameValuePair("startName", nome));
+            post.setEntity(new UrlEncodedFormEntity(postParameters,HTTP.UTF_8));
+
+            httpclient = HttpClients.createDefault();
+            response = httpclient.execute(post);
+
+            int statusCode = response.getStatusLine().getStatusCode();
+
+            if ( statusCode >= 400 ){
+                System.out.println("####### ERRO: " + EntityUtils.toString(response.getEntity(), HTTP.UTF_8));
+            }else{
+                System.out.println("BUSCA DE PROFISSIONAL EXECUTADA COM SUCESSO.");
+            }
+
+            String json = EntityUtils.toString(response.getEntity(), HTTP.UTF_8);
+
+            ProfissionalBasicoVo [] profissionais = gson.fromJson(json, ProfissionalBasicoVo[].class);
+
+            return profissionais.length > 0 ? profissionais[0] : null;
+
+        }finally {
+            httpclient.close();
+        }
+    }
+
+    private static int[] getEspecialidade(List<EspecialidadeVo> especs) {
+        if (especs != null){
+            int [] ids = new int[]{};
+            for(EspecialidadeVo e : especs){
+                Integer id = getEspecialidadeByVo(e);
+                if (id != null){
+                    ids = ArrayUtils.add(ids,id);
+                }
+
+            }
+            return ids;
         }
         return null;
     }
 
-    private static EspecialidadeEntity getEspecialidadeByVo(EspecialidadeVo e) {
+    private static Integer getEspecialidadeByVo(EspecialidadeVo e) {
         for(EspecialidadeEntity ee : especialidades){
 
             //verificando igualdade completa
             if (ee.getNome().equalsIgnoreCase(e.getNome())){
-                return ee;
+                return ee.getId();
             }
 
             //verificando igualdade parcial
@@ -128,7 +228,7 @@ public class ImportMed {
                 }
 
                 if (equal){
-                    return ee;
+                    return ee.getId();
                 }
 
             }
@@ -137,23 +237,34 @@ public class ImportMed {
     }
 
     private static String getParcial(String s) {
+        if (StringUtils.isBlank(s)){
+            return s;
+        }
+        if (s.length() < 6){
+            return s;
+        }
         return s.substring(0,s.length()-3);
     }
 
-    private static List<MedicoClinicaEntity> getClinicas(List<EnderecoVo> enderecos, MedicoEntity m) {
-        List<MedicoClinicaEntity> medicoClinicaEntities = new ArrayList<MedicoClinicaEntity>();
-        for(EnderecoVo e : enderecos){
-            MedicoClinicaEntity mc = new MedicoClinicaEntity();
-
-            mc.setClinica(getClinica(e, m));
-            medicoClinicaEntities.add(mc);
+    private static List<ClinicaForm> getClinicas(ProfissionalForm m, MedicoVo medicoVo) {
+        List<ClinicaForm> clinicas = new ArrayList<ClinicaForm>();
+        for(EnderecoVo e : medicoVo.getEnderecos()){
+            clinicas.add(getClinica(e, m));
         }
-        return medicoClinicaEntities;
+        return clinicas;
     }
 
-    private static ClinicaEntity getClinica(EnderecoVo e, MedicoEntity m) {
-        ClinicaEntity c = new ClinicaEntity();
-        EnderecoEntity ee = new EnderecoEntity();
+    private static ClinicaForm getClinica(EnderecoVo e, ProfissionalForm m) {
+        ClinicaForm c = new ClinicaForm();
+        boolean aceitaParticular = getAceitaParticular(e.getConvenios());
+        c.setAceitaParticular(aceitaParticular);
+        c.setIdsCategorias(getIdsCategorias(e.getConvenios()));
+        c.setHoraFuncionamentoFim("18:00");
+        c.setHoraFuncionamentoIni("8:00");
+        c.setTempoConsultaEmMin(15);
+        c.setAberturaAgenda("SEMANAL");
+        EnderecoForm ee = new EnderecoForm();
+
         ee.setUf(e.getUf());
         ee.setBairro(e.getBairro());
         ee.setCep(e.getCep() != null ? e.getCep().replace("-","") : "");
@@ -237,6 +348,66 @@ public class ImportMed {
         }
 
         return c;
+    }
+
+    private static int[] getIdsCategorias(List<ConvenioVo> convenios) {
+        if (convenios != null){
+            int [] ids = new int[convenios.size()];
+            for(ConvenioVo c : convenios){
+                Integer id = getCategoriasByVo(c);
+                if (id != null){
+                    ids = ArrayUtils.add(ids,id);
+                }
+            }
+            return ids;
+        }
+        return null;
+    }
+
+    private static Integer getCategoriasByVo(ConvenioVo c) {
+        for(ConvenioCategoriaVo cc : categorias){
+
+            //verificando igualdade completa
+            if (cc.getConvenioVo().getNome().equalsIgnoreCase(c.getNome())){
+                return cc.getId();
+            }
+
+            //verificando igualdade parcial
+            String nomeVo = c.getNome();
+            String nomeEntity = cc.getConvenioVo().getNome();
+
+            //checando até 80% do valor do nome do convenio.
+            String nomeVoParcial = getParcial(nomeVo.trim());
+            String nomeEntityParcial = getParcial(nomeEntity.trim());
+
+            if (nomeVoParcial.equalsIgnoreCase(nomeEntityParcial)){
+                return cc.getId();
+            }
+
+            if (nomeVoParcial.contains(nomeEntityParcial)){
+                return cc.getId();
+            }
+
+            if (nomeEntityParcial.contains(nomeVoParcial)){
+                return cc.getId();
+            }
+
+        }
+        return null;
+    }
+
+    private static boolean getAceitaParticular(List<ConvenioVo> convenios) {
+
+        if (convenios != null){
+            for (ConvenioVo c : convenios) {
+                if (c.getNome() != null){
+                    if ("PARTICULAR".equals(c.getNome()) || "PARTICULARES".equals(c.getNome()) || c.getNome().contains("PARTICU") ){
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
 }

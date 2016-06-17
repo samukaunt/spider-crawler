@@ -5,7 +5,7 @@ import java.io.Serializable;
 /**
  * Created by wagner on 15/06/15.
  */
-public class EnderecoEntity implements Serializable{
+public class EnderecoForm implements Serializable{
 
     private static final long serialVersionUID = 7207991135581266227L;
 

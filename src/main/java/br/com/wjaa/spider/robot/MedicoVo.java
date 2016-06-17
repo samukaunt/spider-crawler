@@ -138,4 +138,5 @@ public class MedicoVo implements Serializable{
         }
         this.enderecos.add(endVo);
     }
+
 }

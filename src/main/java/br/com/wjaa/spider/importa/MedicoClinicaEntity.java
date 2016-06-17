@@ -7,7 +7,7 @@ public class MedicoClinicaEntity {
 
     private Long id;
     private Long idMedico;
-    private ClinicaEntity clinica;
+    private ClinicaForm clinica;
     private Short ddd;
     private Long telefone;
 
@@ -28,11 +28,11 @@ public class MedicoClinicaEntity {
         this.idMedico = idMedico;
     }
 
-    public ClinicaEntity getClinica() {
+    public ClinicaForm getClinica() {
         return clinica;
     }
 
-    public void setClinica(ClinicaEntity clinica) {
+    public void setClinica(ClinicaForm clinica) {
         this.clinica = clinica;
     }
 

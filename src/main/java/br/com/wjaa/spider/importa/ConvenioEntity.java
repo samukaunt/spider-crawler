@@ -10,7 +10,7 @@ public class ConvenioEntity {
     private Integer id;
     private String nome;
     private Boolean popular;
-    private List<ConvenioCategoriaEntity> categorias;
+    private List<ConvenioCategoriaVo> categorias;
 
     public Integer getId() {
         return id;
@@ -37,11 +37,11 @@ public class ConvenioEntity {
         this.popular = popular;
     }
 
-    public List<ConvenioCategoriaEntity> getCategorias() {
+    public List<ConvenioCategoriaVo> getCategorias() {
         return categorias;
     }
 
-    public void setCategorias(List<ConvenioCategoriaEntity> categorias) {
+    public void setCategorias(List<ConvenioCategoriaVo> categorias) {
         this.categorias = categorias;
     }
 
