@@ -12,6 +12,13 @@ public class EspecialidadeVo implements Serializable {
     private String nome;
     private Boolean popular;
 
+    public EspecialidadeVo() {
+    }
+
+    public EspecialidadeVo(String nome) {
+        this.nome = nome;
+    }
+
     public Integer getId() {
         return id;
     }
@@ -34,5 +41,28 @@ public class EspecialidadeVo implements Serializable {
 
     public void setPopular(Boolean popular) {
         this.popular = popular;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        EspecialidadeVo that = (EspecialidadeVo) o;
+
+        return nome.equals(that.nome);
+
+    }
+
+    @Override
+    public int hashCode() {
+        return nome.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "EspecialidadeVo{" +
+                "nome='" + nome + '\'' +
+                '}';
     }
 }

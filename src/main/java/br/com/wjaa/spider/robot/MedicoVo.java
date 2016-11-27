@@ -139,4 +139,13 @@ public class MedicoVo implements Serializable{
         this.enderecos.add(endVo);
     }
 
+
+    @Override
+    public String toString() {
+        return "MedicoVo{" +
+                "nome='" + nome + '\'' +
+                ", enderecos=" + enderecos +
+                ", especialidades=" + especialidades +
+                '}';
+    }
 }

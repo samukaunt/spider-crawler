@@ -24,6 +24,7 @@ public class EnderecoVo implements Serializable{
     private Long idLogin;
     private String telefone;
     private List<ConvenioVo> convenios;
+    private String nomeClinica;
 
 
     public Long getId() {
@@ -141,5 +142,30 @@ public class EnderecoVo implements Serializable{
 
     public void setConvenios(List<ConvenioVo> convenios) {
         this.convenios = convenios;
+    }
+
+    public String getNomeClinica() {
+        return nomeClinica;
+    }
+
+    public void setNomeClinica(String nomeClinica) {
+        this.nomeClinica = nomeClinica;
+    }
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        EnderecoVo that = (EnderecoVo) o;
+
+        return cep != null ? cep.equals(that.cep) : that.cep == null;
+
+    }
+
+    @Override
+    public int hashCode() {
+        return cep != null ? cep.hashCode() : 0;
     }
 }
