@@ -45,7 +45,7 @@ public class XlsImportDentista {
             if (m == null){
                 m = new MedicoVo();
                 //PEGAR AQUI O NUMERO DO CRM NO CAMPO DE PESSOA FISICA
-                //m.setCrm(0);
+                m.setCrm(getCrm(row.getCell(8).toString()));
                 m.setEnderecos(new ArrayList<>());
                 m.setEspecialidades(new ArrayList<>());
                 medicoVos.add(m);
@@ -101,6 +101,18 @@ public class XlsImportDentista {
 
 
 
+    }
+
+    private static Integer getCrm(String s) {
+        try{
+            if (s.contains("Pessoa Fisica ")){
+                return Integer.valueOf(s.replace("Pessoa Fisica ",""));
+            }
+        }catch(Exception ex){
+            ex.printStackTrace();
+        }
+
+        return null;
     }
 
     private static MedicoVo getMedicoByName(String nome, List<MedicoVo> medicoVos) {
