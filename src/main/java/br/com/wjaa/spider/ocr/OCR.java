@@ -31,6 +31,7 @@ public class OCR {
         letsGoSelenium();
         System.out.println("Selenium iniciado....");
         start();
+
     }
 
     static int count = 1;
@@ -40,6 +41,22 @@ public class OCR {
         List<String> cnpjs = getCnpjs();
 
         for (String cnpj : cnpjs) {
+
+            if (cnpj.length() > 11 && cnpj.length() < 14){
+                cnpj = String.format("%014d", new Long(cnpj));
+                if (!isValidCNPJ(cnpj)){
+                    appendErrorFile(cnpj);
+                    return;
+                }
+            }
+
+            if (cnpj.length() < 11){
+                cnpj = String.format("%011d", new Long(cnpj));
+                if (!isValidCPF(cnpj)){
+                    appendErrorFile(cnpj);
+                    return;
+                }
+            }
 
             boolean retry = true;
             while (retry) {
@@ -73,6 +90,39 @@ public class OCR {
 
     }
 
+    private static final int[] pesoCPF = {11, 10, 9, 8, 7, 6, 5, 4, 3, 2};
+    private static final int[] pesoCNPJ = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+
+    public static boolean isValidCPF(String cpf) {
+        if ((cpf==null) || (cpf.length()<10)) return false;
+
+
+        Integer digito1 = calcularDigito(cpf.substring(0,9), pesoCPF);
+        Integer digito2 = calcularDigito(cpf.substring(0,9) + digito1, pesoCPF);
+        return cpf.equals(cpf.substring(0,9) + digito1.toString() + digito2.toString());
+    }
+
+
+    public static boolean isValidCNPJ(String cnpj) {
+        if ((cnpj==null)||(cnpj.length()<13)) return false;
+
+        Integer digito1 = calcularDigito(cnpj.substring(0,12), pesoCNPJ);
+        Integer digito2 = calcularDigito(cnpj.substring(0,12) + digito1, pesoCNPJ);
+        return cnpj.equals(cnpj.substring(0,12) + digito1.toString() + digito2.toString());
+    }
+
+    private static int calcularDigito(String str, int[] peso) {
+        int soma = 0;
+        for (int indice=str.length()-1, digito; indice >= 0; indice-- ) {
+            digito = Integer.parseInt(str.substring(indice,indice+1));
+            soma += digito*peso[peso.length-str.length()+indice];
+        }
+        soma = 11 - soma % 11;
+        return soma > 9 ? 0 : soma;
+    }
+
+
+
     private static List<String> getCnpjs() throws IOException {
         return IOUtils.readLines(new FileInputStream(new File("/home/wagner/Downloads/javaocr/testes/cnpjs.csv")));
 
@@ -81,8 +131,19 @@ public class OCR {
     private static void appendFile(String json) {
         try {
             FileWriter fw = new FileWriter("/home/wagner/Downloads/javaocr/testes/transportador.json", true); //the true will append the new data
-            fw.write(json);//appends the string to the file
-            fw.write("\n\n");//appends the string to the file
+            fw.write(json + ",");//appends the string to the file
+            fw.write("\n");//appends the string to the file
+            fw.close();
+        } catch (IOException ioe) {
+            System.err.println("IOException: " + ioe.getMessage());
+        }
+    }
+
+    private static void appendErrorFile(String cnpj) {
+        try {
+            FileWriter fw = new FileWriter("/home/wagner/Downloads/javaocr/testes/cnpj_invalidos.json", true); //the true will append the new data
+            fw.write(cnpj + ",");//appends the string to the file
+            fw.write("\n");//appends the string to the file
             fw.close();
         } catch (IOException ioe) {
             System.err.println("IOException: " + ioe.getMessage());
@@ -96,7 +157,7 @@ public class OCR {
         inputCnpj.sendKeys(cnpj);
         driver.findElement(By.id("btn-consultar")).click();
 
-        Thread.sleep(5000);
+        Thread.sleep(6000);
 
         String msg = null;
 
@@ -111,68 +172,99 @@ public class OCR {
         }
         System.out.println("DEU CERTO INICIANDO A COLETA DOS DADOS" + msg);
 
+        try{
 
-        WebElement we = driver.findElement(By.cssSelector("#div-resultado .box-body"));
-        Transportador t = getTransportador(we);
+            WebElement we = driver.findElement(By.cssSelector("#div-resultado .box-body"));
+            Transportador t = getTransportador(we, cnpj);
+            if (t != null){
+                appendFile(new GsonBuilder().create().toJson(t));
+                transportadors.add(t);
+            }
+        }catch(Exception ex){
 
-        appendFile(new GsonBuilder().create().toJson(t));
+            Thread.sleep(5000);
+            WebElement we = driver.findElement(By.cssSelector("#div-resultado .box-body"));
+            Transportador t = getTransportador(we, cnpj);
+            if (t != null){
+                appendFile(new GsonBuilder().create().toJson(t));
+                transportadors.add(t);
+            }
 
-        transportadors.add(t);
+
+        }
+
 
         return true;
 
-
     }
 
-    private static Transportador getTransportador(WebElement we) {
-        Transportador t = new Transportador();
-        List<WebElement> listDados = we.findElements(By.className("row"));
-        WebElement dados1 = listDados.get(0);
-        try {
-            t.setNome(dados1.findElement(By.cssSelector(".form-group .col-md-10")).getText());
-        } catch (Exception ex) {
+    private static Transportador getTransportador(WebElement we, String cnpj) {
+        try{
 
+            Transportador t = new Transportador();
+            List<WebElement> listDados = we.findElements(By.className("row"));
+            WebElement dados1 = listDados.get(0);
+            try {
+                t.setNome(dados1.findElement(By.cssSelector(".form-group .col-md-10")).getText());
+            } catch (Exception ex) {
+
+            }
+
+            WebElement dados2 = listDados.get(1);
+
+            try {
+                t.setCpfCnpj(dados2.findElements(By.cssSelector(".form-group .col-md-3")).get(0).getText());
+                t.setDesde(dados2.findElement(By.cssSelector(".form-group .col-md-4")).getText());
+            } catch (Exception ex) {
+
+            }
+
+            WebElement dados3 = listDados.get(2);
+
+            try {
+                t.setRntrc(dados3.findElements(By.cssSelector(".form-group .col-md-3")).get(0).getText());
+                t.setValidade(dados3.findElement(By.cssSelector(".form-group .col-md-4")).getText());
+            } catch (Exception ex) {
+
+            }
+
+            WebElement dados4 = listDados.get(3);
+
+            try {
+                t.setSituacaoRntrc(dados4.findElements(By.cssSelector(".form-group .col-md-3")).get(0).getText());
+                t.setMunicipio(dados4.findElement(By.cssSelector(".form-group .col-md-4")).getText());
+            } catch (Exception ex) {
+
+            }
+
+            return t;
+        }catch(Exception ex){
+            System.out.println("ERRO AO PEGAR OS DADOS DO TRANSPORTADOR PULANDO O CNPJ:" + cnpj);
+            appendErrorFile(cnpj);
         }
-
-        WebElement dados2 = listDados.get(1);
-
-        try {
-            t.setCpfCnpj(dados2.findElements(By.cssSelector(".form-group .col-md-3")).get(0).getText());
-            t.setDesde(dados2.findElement(By.cssSelector(".form-group .col-md-4")).getText());
-        } catch (Exception ex) {
-
-        }
-
-        WebElement dados3 = listDados.get(2);
-
-        try {
-            t.setRntrc(dados3.findElements(By.cssSelector(".form-group .col-md-3")).get(0).getText());
-            t.setValidade(dados3.findElement(By.cssSelector(".form-group .col-md-4")).getText());
-        } catch (Exception ex) {
-
-        }
-
-        WebElement dados4 = listDados.get(3);
-
-        try {
-            t.setSituacaoRntrc(dados4.findElements(By.cssSelector(".form-group .col-md-3")).get(0).getText());
-            t.setMunicipio(dados4.findElement(By.cssSelector(".form-group .col-md-4")).getText());
-        } catch (Exception ex) {
-
-        }
-
-        return t;
+        return null;
 
     }
 
     private static void saveImage() throws IOException, InterruptedException {
         driver.findElement(By.id("recaptcha_reload")).click();
         Thread.sleep(2000);
-        WebElement inputCaptcha = driver.findElement(By.id("recaptcha_challenge_image"));
-        String image = inputCaptcha.getAttribute("src");
-        URL url = new URL(image);
-        BufferedImage buffImage = ImageIO.read(url);
-        ImageIO.write(buffImage, "jpg", new File("/home/wagner/Downloads/javaocr/testes/image.jpg"));
+
+        try{
+
+            WebElement inputCaptcha = driver.findElement(By.id("recaptcha_challenge_image"));
+            String image = inputCaptcha.getAttribute("src");
+            URL url = new URL(image);
+            BufferedImage buffImage = ImageIO.read(url);
+            ImageIO.write(buffImage, "jpg", new File("/home/wagner/Downloads/javaocr/testes/image.jpg"));
+        }catch(Exception ex){
+            Thread.sleep(5000);
+            WebElement inputCaptcha = driver.findElement(By.id("recaptcha_challenge_image"));
+            String image = inputCaptcha.getAttribute("src");
+            URL url = new URL(image);
+            BufferedImage buffImage = ImageIO.read(url);
+            ImageIO.write(buffImage, "jpg", new File("/home/wagner/Downloads/javaocr/testes/image.jpg"));
+        }
 
     }
 

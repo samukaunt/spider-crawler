@@ -74,4 +74,5 @@ public class Transportador {
     public List<String> getValues() {
         return Arrays.asList(this.nome,this.cpfCnpj,this.rntrc,this.situacaoRntrc,this.desde,this.validade,this.municipio);
     }
+
 }
